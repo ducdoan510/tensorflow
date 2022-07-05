@@ -998,6 +998,8 @@ class XlaBuilder {
 
   int64_t GetNextId() { return ++next_id_; }
 
+  int64_t GetIdOrCreateNext(const XlaComputation& computation);
+
   // Populates the module with the input/output alias information stored within
   // the input_output_aliases vector.
   static Status PopulateInputOutputAlias(
@@ -1009,6 +1011,9 @@ class XlaBuilder {
   // The next sequential ID for every instruction/computation contained within
   // this computation.
   int64_t next_id_ = 0;
+
+  // Map for reusing id of simple subcomputation
+  std::map<std::pair<std::string, xla::PrimitiveType>, int64_t> idCache;
 
   // The first error encountered while building the computation.
   // This is OK until the first error is encountered.
@@ -1485,6 +1490,8 @@ class XlaBuilder {
   Status CheckOpBuilder(XlaOp op) const;
 
  private:
+  bool IsComputationIdCachable(const XlaComputation&) const;
+
   XlaOp ConditionalImpl(
       XlaOp branch_index,
       absl::Span<const XlaComputation* const> branch_computations,
