@@ -3907,7 +3907,6 @@ int64_t XlaBuilder::GetIdOrCreateNext(const XlaComputation& computation) {
 
 void XlaBuilder::AddCalledComputation(const XlaComputation& computation,
                                       HloInstructionProto* instr) {
-  // std::cout << "===In xla builder AddCalledComputation: XlaComputation Name=" << computation.name() << std::endl;
   absl::flat_hash_map<int64_t, int64_t> remapped_ids;
   std::vector<HloComputationProto> imported_computations;
   imported_computations.reserve(computation.proto().computations_size());
@@ -3919,19 +3918,16 @@ void XlaBuilder::AddCalledComputation(const XlaComputation& computation,
     // int64_t computation_id = GetNextId();
     int64_t computation_id = GetIdOrCreateNext(computation);
     remapped_ids[new_computation.id()] = computation_id;
-    // std::cout << "HloComputationProto New name: " << GetBaseName(new_computation.name(), kNameSeparator) << kNameSeparator << computation_id << ", root id = " << new_computation.root_id();
     SetProtoIdAndName(&new_computation,
                       GetBaseName(new_computation.name(), kNameSeparator),
                       kNameSeparator, computation_id);
     for (auto& instruction : *new_computation.mutable_instructions()) {
       int64_t instruction_id = GetNextId();
       remapped_ids[instruction.id()] = instruction_id;
-      // std::cout << "HloInstructionProto New name: " << GetBaseName(instruction.name(), kNameSeparator) << kNameSeparator << instruction_id << std::endl;
       SetProtoIdAndName(&instruction,
                         GetBaseName(instruction.name(), kNameSeparator),
                         kNameSeparator, instruction_id);
     }
-    // std::cout << "->" << remapped_ids.at(new_computation.root_id()) << std::endl;
     new_computation.set_root_id(remapped_ids.at(new_computation.root_id()));
 
     imported_computations.push_back(std::move(new_computation));
