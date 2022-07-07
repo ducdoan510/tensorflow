@@ -3888,19 +3888,34 @@ bool XlaBuilder::IsComputationIdCachable(const XlaComputation& comp) const {
 }
 
 int64_t XlaBuilder::GetIdOrCreateNext(const XlaComputation& computation) {
-  const char* env = std::getenv("CACHE_SUBCOMPUTATION");
-  bool cacheSubcomputation = env != nullptr && std::strcmp(env, "true") == 0;
+  const char* cacheEnv = std::getenv("CACHE_SUBCOMPUTATION");
+  bool cacheSubcomputation = cacheEnv != nullptr && std::strcmp(cacheEnv, "true") == 0;
   if (cacheSubcomputation && IsComputationIdCachable(computation)) {
+    const char* cacheProbEnv = std::getenv("CACHE_PROBABILITY");
+    float cacheProb = cacheProbEnv != nullptr ? atof(cacheProbEnv) : 1.0f;
+
     std::string computationType = GetBaseName(computation.name(), kNameSeparator);
     auto programShapeStatus = computation.GetProgramShape();
     const ProgramShape& progShape = programShapeStatus.ValueOrDie();
     const Shape& shape = progShape.parameters(0);
     PrimitiveType elemType = shape.element_type();
     auto computationKey = std::make_pair(computationType, elemType);
-    if (idCache.find(computationKey) == idCache.end()) {
-      idCache[computationKey] = GetNextId();
+
+    float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    if (r > cacheProb) {
+      int64_t nextId = GetNextId();
+      if (idCache.find(computationKey) == idCache.end()) {
+        idCache[computationKey] = std::vector<int64_t>{nextId};  
+      } else {
+        idCache[computationKey].push_back(nextId);
+      }
+      return nextId;
     }
-    return idCache[computationKey];
+
+    if (idCache.find(computationKey) == idCache.end()) {
+      idCache[computationKey] = std::vector<int64_t>{GetNextId()};
+    }
+    return idCache[computationKey][rand() % idCache[computationKey].size()];
   }
   return GetNextId();
 }

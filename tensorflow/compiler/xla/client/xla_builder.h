@@ -1013,7 +1013,7 @@ class XlaBuilder {
   int64_t next_id_ = 0;
 
   // Map for reusing id of simple subcomputation
-  std::map<std::pair<std::string, xla::PrimitiveType>, int64_t> idCache;
+  std::map<std::pair<std::string, xla::PrimitiveType>, std::vector<int64_t>> idCache;
 
   // The first error encountered while building the computation.
   // This is OK until the first error is encountered.
