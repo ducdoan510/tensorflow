@@ -662,11 +662,11 @@ Status GpuCompiler::OptimizeHloModule(
     TF_RETURN_IF_ERROR(pipeline.Run(hlo_module).status());
   }
 
-  {
-    HloPassPipeline pipeline("localize-constant optimization");
-    pipeline.AddPass<LocalizeConstant>();
-    TF_RETURN_IF_ERROR(pipeline.Run(hlo_module).status());
-  }
+  // {
+  //   HloPassPipeline pipeline("localize-constant optimization");
+  //   pipeline.AddPass<LocalizeConstant>();
+  //   TF_RETURN_IF_ERROR(pipeline.Run(hlo_module).status());
+  // }
 
   return Status::OK();
 }
@@ -1257,6 +1257,33 @@ GpuCompiler::CompileToTargetBinary(const HloModuleConfig& module_config,
         llvm_modules.push_back(std::move(module));
       },
       /*PreserveLocals=*/true);
+
+  std::map<std::string, llvm::Constant*> constantBufferInitializer;
+
+  // run one pass to collect constant buffers' initializers
+  for (int i = 0; i < llvm_modules.size(); i++) {
+    for (auto &gv: llvm_modules[i]->globals()) {
+      std::string gvName = gv.getGlobalIdentifier();
+      if (gvName.find("buffer_for_constant") != std::string::npos) {
+        if (gv.hasInitializer()) {
+          constantBufferInitializer[gvName] = gv.getInitializer();
+        }
+      }
+    }
+  }
+
+  // if the global variable is buffer_for_constant and external, localize it
+  for (int i = 0; i < llvm_modules.size(); i++) {
+    for (auto &gv: llvm_modules[i]->globals()) {
+      std::string gvName = gv.getGlobalIdentifier();
+      if (gvName.find("buffer_for_constant") != std::string::npos) {
+        if (!gv.hasInitializer()) {
+          gv.setInitializer(constantBufferInitializer[gvName]);
+          gv.setLinkage(llvm::GlobalValue::InternalLinkage);
+        }
+      }
+    }
+  }
 
   std::vector<StatusOr<BackendCompileResult>> compile_results(
       llvm_modules.size());
